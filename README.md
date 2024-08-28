@@ -50,7 +50,7 @@ on:
   workflow_dispatch:
     inputs:
       importAll:
-        default: 'false'
+        default: false
         required: false
         type: boolean
         description: Enable, if you want to import all TODOs. Runs on checked out branch! Only use if you're sure what you are doing.
@@ -69,10 +69,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Run Issue Bot
-        uses: derjuulsn/todo-issue@main
+        uses: juulsn/todo-issue@main
         with:
           excludePattern: '^(node_modules/)'
         env:
@@ -128,3 +128,9 @@ For instance this:
 ```
 
 would result in a new issue without a body because `//+` is not equal to `//-` (also counts for whitespace!)
+
+### Task Systems
+
+Currently, the bot only supports GitHub Issues. However, all requests to the APIs are handled through an interface, 
+which makes it easy to support multiple.
+If you want to add support for another task system, you are welcome to contribute and / or file an issue

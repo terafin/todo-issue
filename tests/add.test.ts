@@ -1,35 +1,41 @@
 import {argumentContext} from "../src/ArgumentContext";
-import {checkSimilarity} from "../src/helpers";
+import {checkSimilarity} from "../src/Helpers";
 import {Todo} from "../src/Todo";
 import {config} from "dotenv";
+// @ts-ignore
+import {testTodoChange} from "./helpers";
+import {currentTaskSystem, setTaskSystem} from "../src/TaskSystem";
+import {GitHubTaskSystem} from "../src/TaskSystems/GithubTaskSystem";
+import {addFakeIssue, clearFakeIssues} from "../src/TaskSystems/MockedTaskSystem";
 
 config();
 
-// @ts-ignore
-import {testTodoChange} from "./helpers";
-
-// shouldn't mock TodoHandler, but octokit..
-jest.mock("../src/TodoHandler")
+jest.mock("../src/TaskSystem")
 jest.mock("../src/GitHubContext")
-
-const context = require("../src/GitHubContext")
-const todoHandler = require("../src/TodoHandler")
-
-let existingIssues: any[] = [];
 
 describe("Add Test", () => {
 
     beforeEach(() => {
         jest.resetModules()
-        existingIssues = []
+        clearFakeIssues();
     })
 
-    context.getIssues.mockImplementation(() => ({data: existingIssues}))
+    setTaskSystem(new GitHubTaskSystem());
+    const taskSystem = (currentTaskSystem() as any);
 
     const test = (file: string, expects = {}) => testTodoChange("add", file, expects);
 
     it("Adds One Todo", async () => {
         await test("Add", {addTodo: 1})
+    })
+
+    it("Supports non-word characters in title", async () => {
+
+        taskSystem.addTodo.mockImplementationOnce((todo: Todo) => {
+            expect(todo.title).toEqual("你好世界")
+        })
+
+        await test("AddChinese", {addTodo: 1})
     })
 
     it("Adds Body", async () => {
@@ -47,7 +53,7 @@ describe("Add Test", () => {
 
     it("Adds One TODO in HTML", async () => {
 
-        todoHandler.addTodo.mockImplementationOnce((todo: Todo) => {
+        taskSystem.addTodo.mockImplementationOnce((todo: Todo) => {
             expect(todo.title.endsWith('-->')).toBeFalsy()
         })
 
@@ -59,14 +65,15 @@ describe("Add Test", () => {
     })
 
     it("Adds TODO with similar title as existing", async () => {
-        existingIssues.push({
+        addFakeIssue({
+            type: 'exists',
             title: 'should we reinvent the gear here??',
-            number: 2,
-            state: "open",
+            issueId: 2,
+            open: true,
             assignees: []
         })
 
-        todoHandler.addReferenceTodo.mockImplementationOnce((todo: Todo) => {
+        taskSystem.addReferenceTodo.mockImplementationOnce((todo: Todo) => {
             expect(todo.similarTodo?.issueId).toBeCloseTo(2)
         })
 
@@ -74,14 +81,15 @@ describe("Add Test", () => {
     })
 
     it("Adds TODO with similar title as closed existing", async () => {
-        existingIssues.push({
+        addFakeIssue({
+            type: 'exists',
             title: 'should we reinvent the gear here??',
-            number: 2,
-            state: "closed",
-            assignees: [{login: 'DerJuulsn'}]
+            issueId: 2,
+            open: false,
+            assignees: ['DerJuulsn']
         })
 
-        todoHandler.addReferenceTodo.mockImplementationOnce((todo: Todo) => {
+        taskSystem.addReferenceTodo.mockImplementationOnce((todo: Todo) => {
             expect(todo.similarTodo?.issueId).toBeCloseTo(2)
             expect(todo.similarTodo?.assignees).toContainEqual('DerJuulsn')
             expect(todo.similarTodo?.assignees).toContainEqual('TestUser')
@@ -99,10 +107,11 @@ describe("Add Test", () => {
     })
 
     it("Adds Two similar TODOs with existing", async () => {
-        existingIssues.push({
+        addFakeIssue({
             title: 'should we reinvent the gear here..',
             number: 3,
-            state: "closed",
+            type: "exists",
+            open: false,
             assignees: []
         })
         await test("AddTwoSimilar", {addReferenceTodo: 2, reopenTodo: 1})
@@ -110,7 +119,7 @@ describe("Add Test", () => {
 
     it("Adds TODO with body", async () => {
 
-        todoHandler.addTodo.mockImplementationOnce((todo: Todo) => {
+        taskSystem.addTodo.mockImplementationOnce((todo: Todo) => {
             expect(todo.bodyComment).toHaveLength(531)
             expect(todo.assignees).toContainEqual('TestUser')
         })
@@ -125,12 +134,12 @@ describe("Add Test", () => {
     it("Add all", async () => {
         const added: any[] = []
 
-        todoHandler.addTodo.mockImplementation((todo: Todo) => {
+        taskSystem.addTodo.mockImplementation((todo: Todo) => {
             expect(added.find(value => checkSimilarity(value.title, todo.title))).toBeUndefined()
             added.push(todo)
         })
 
-        todoHandler.addReferenceTodo.mockImplementation((todo: Todo) => {
+        taskSystem.addReferenceTodo.mockImplementation((todo: Todo) => {
             expect(added.find(value => checkSimilarity(value.title, todo.title))).toBeDefined()
         })
 

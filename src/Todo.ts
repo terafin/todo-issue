@@ -14,7 +14,7 @@ export async function generateTodosFromCommit() {
     const todos: Todo[] = []
 
     // RegEx that matches lines with the configured keywords
-    const regex = new RegExp(`^(?<beforeTag>\\W+)(?<keyword>${argumentContext.keywords.join('|')})\\b\\W*(?<title>((?!-->).)+)`, (!argumentContext.caseSensitive ? 'i' : ''))
+    const regex = new RegExp(`^(?<beforeTag>\\W+)(?<keyword>${argumentContext.keywords.join('|')})\\b\\S*(?<title>((?!-->).)+)`, (!argumentContext.caseSensitive ? 'i' : ''))
 
     let files: File[];
 
@@ -131,7 +131,6 @@ export declare type Todo = {
     username: string
     assignedToString: string
     assignees: string[]
-    number: number | false
     issueId: number | false
     open: boolean | undefined
     range: string
